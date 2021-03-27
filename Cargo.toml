@@ -1,8 +1,15 @@
 [package]
-name = "fp-growth-rs"
-version = "0.1.0"
 authors = ["JmPotato <ghzpotato@gmail.com>"]
+categories = ["algorithms", "science"]
+description = "An implementation of the FP-Growth algorithm in pure Rust"
 edition = "2018"
+homepage = "https://github.com/JmPotato/fp-growth-rs"
+keywords = ["data_mining", "fp-growth"]
+license-file = "LICENSE"
+name = "fp-growth"
+readme = "README.md"
+repository = "https://github.com/JmPotato/fp-growth-rs"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

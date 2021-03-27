@@ -4,6 +4,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
     rc::{Rc, Weak},
+    usize,
 };
 
 type RcNode<T> = Rc<Node<T>>;
@@ -11,7 +12,7 @@ type WeakRcNode<T> = Weak<Node<T>>;
 
 // Node represents the single node in a tree.
 #[derive(Debug)]
-struct Node<T> {
+pub struct Node<T> {
     item: Option<T>,
     count: Cell<usize>,
     children: RefCell<Vec<RcNode<T>>>,
@@ -54,9 +55,9 @@ where
     // Add the given child Node as a child of this node.
     fn add_child(self: &Rc<Self>, child_node: RcNode<T>) {
         let mut children = self.children.borrow_mut();
-        if !children.contains(&Rc::clone(&child_node)) {
-            *child_node.parent.borrow_mut() = Rc::downgrade(&Rc::clone(self));
-            children.push(Rc::clone(&child_node))
+        if !children.contains(&child_node) {
+            *child_node.parent.borrow_mut() = Rc::downgrade(self);
+            children.push(child_node);
         }
     }
 
@@ -73,22 +74,10 @@ where
         None
     }
 
-    // Check whether exists a child Node holds the given item.
-    fn child_contains(&self, item: T) -> bool {
-        for node in self.children.borrow().iter() {
-            if let Some(child_node_item) = node.item {
-                if child_node_item == item {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     // Increment the count associated with this node's item.
-    fn increment(&self) {
+    fn increment(&self, incr_count: usize) {
         let old_count = self.count.get();
-        self.count.set(old_count + 1);
+        self.count.set(old_count + incr_count);
     }
 
     fn print(&self, depth: usize) {
@@ -104,16 +93,19 @@ where
         }
     }
 
+    pub fn count(&self) -> usize {
+        self.count.get()
+    }
+
     fn neighbor(&self) -> Option<RcNode<T>> {
         self.neighbor.borrow().upgrade()
     }
 
+    fn parent(&self) -> Option<RcNode<T>> {
+        self.parent.borrow().upgrade()
+    }
     fn is_root(&self) -> bool {
         self.item == None && self.count.get() == 0
-    }
-
-    fn is_leaf(&self) -> bool {
-        self.children.borrow().len() == 0
     }
 }
 
@@ -136,6 +128,47 @@ where
         }
     }
 
+    // Generate a partial tree with the given paths.
+    // This function will be called during the algorithm.
+    pub fn generate_partial_tree(paths: Vec<Vec<RcNode<T>>>) -> Tree<T> {
+        let mut partial_tree = Tree::new();
+        let mut leaf_item = None;
+        for path in paths.iter() {
+            // Get leaf_count from the leaf node.
+            leaf_item = Some(path.last().unwrap().item.unwrap());
+            let mut cur_node = Rc::clone(&partial_tree.root_node.borrow());
+            for path_node in path.iter() {
+                match cur_node.search(path_node.item.unwrap()) {
+                    Some(child_node) => {
+                        cur_node = child_node;
+                    }
+                    None => {
+                        let next_node = Node::new_rc(path_node.item, {
+                            let mut count = 0;
+                            if path_node.item == leaf_item {
+                                count = path_node.count.get();
+                            }
+                            count
+                        });
+                        cur_node.add_child(Rc::clone(&next_node));
+                        partial_tree.update_route(Rc::clone(&next_node));
+                        cur_node = next_node;
+                    }
+                }
+            }
+        }
+
+        // Calculate the counts of the non-leaf nodes.
+        for path in partial_tree.generate_prefix_path(leaf_item.unwrap()).iter() {
+            let leaf_count = path.last().unwrap().count.get();
+            for path_node in path[..path.len() - 1].iter() {
+                path_node.increment(leaf_count);
+            }
+        }
+
+        partial_tree
+    }
+
     // Iterate the transaction and add every item to the FP-Growth tree.
     pub fn add_transaction(&mut self, transaction: Vec<T>) {
         let mut cur_node = Rc::clone(&self.root_node.borrow());
@@ -144,7 +177,7 @@ where
                 // There is already a node in this tree for the current
                 // transaction item; reuse it.
                 Some(child_node) => {
-                    child_node.increment();
+                    child_node.increment(1);
                     cur_node = child_node;
                 }
                 None => {
@@ -161,34 +194,76 @@ where
         if let Some(item) = node.item {
             match self.routes.get(&item) {
                 Some((_, tail)) => {
-                    tail.replace_with(|old_tail| {
-                        *old_tail.neighbor.borrow_mut() = Rc::downgrade(&Rc::clone(&node));
-                        node
-                    });
+                    let old_tail = tail.replace(Rc::clone(&node));
+                    *old_tail.neighbor.borrow_mut() = Rc::downgrade(&node);
                 }
                 None => {
-                    self.routes.insert(
-                        item,
-                        (
-                            RefCell::new(Rc::clone(&node)),
-                            RefCell::new(Rc::clone(&node)),
-                        ),
-                    );
+                    self.routes
+                        .insert(item, (RefCell::new(Rc::clone(&node)), RefCell::new(node)));
                 }
             }
         }
     }
 
+    // Generate the prefix paths that end with the given item.
+    pub fn generate_prefix_path(&self, item: T) -> Vec<Vec<RcNode<T>>> {
+        let mut cur_end_node = Rc::clone(&self.routes.get(&item).unwrap().0.borrow());
+        let mut paths = vec![];
+        loop {
+            let mut cur_node = Rc::clone(&cur_end_node);
+            let mut path = vec![Rc::clone(&cur_node)];
+            while let Some(parent_node) = cur_node.parent() {
+                if parent_node.is_root() {
+                    break;
+                }
+                path.push(Rc::clone(&parent_node));
+                cur_node = parent_node;
+            }
+            path.reverse();
+            paths.push(path);
+            match cur_end_node.neighbor() {
+                Some(neighbor_node) => cur_end_node = neighbor_node,
+                None => break,
+            }
+        }
+        paths
+    }
+
+    fn get_all_nodes(&self, item: T) -> Vec<RcNode<T>> {
+        match self.routes.get(&item) {
+            None => vec![],
+            Some((head_node, _)) => {
+                let mut nodes = vec![Rc::clone(&head_node.borrow())];
+                let mut cur_node = Rc::clone(&head_node.borrow());
+                while let Some(neighbor_node) = cur_node.neighbor() {
+                    nodes.push(Rc::clone(&neighbor_node));
+                    cur_node = neighbor_node;
+                }
+                nodes
+            }
+        }
+    }
+
+    // Get all nodes with the given item.
+    pub fn get_all_items_nodes(&self) -> Vec<(T, Vec<RcNode<T>>)> {
+        let mut items_nodes = vec![];
+        for (item, _) in self.routes.iter() {
+            items_nodes.push((*item, self.get_all_nodes(*item)));
+        }
+        items_nodes
+    }
+
+    #[allow(dead_code)]
+    // Print out the tree.
     pub fn print(&self) {
         println!("Tree:");
         self.root_node.borrow().print(1);
         println!("Routes:");
-        for (item, route) in self.routes.iter() {
+        for (item, _) in self.routes.iter() {
             println!("Item: {:?}", *item);
-            let mut cur_node = Rc::clone(&route.0.borrow());
-            while let Some(neighbor_node) = cur_node.neighbor() {
-                println!("<{:?} {}>", neighbor_node.item, neighbor_node.count.get());
-                cur_node = neighbor_node;
+            for node in self.get_all_nodes(*item).iter() {
+                println!("{:?}", Rc::into_raw(Rc::clone(node)));
+                println!("<{:?} {}>", node.item, node.count.get());
             }
         }
     }
@@ -209,25 +284,16 @@ mod tests {
         child_node_1.add_child(Rc::clone(&child_node_2));
 
         assert!(root_node.is_root());
-        assert!(!root_node.is_leaf());
-        assert!(root_node.child_contains(1));
-        assert!(!root_node.child_contains(2));
         assert_eq!(root_node.search(1), Some(Rc::clone(&child_node_1)));
         assert_eq!(root_node.search(2), None);
         assert_eq!(root_node.item, None);
 
         assert!(!child_node_1.is_root());
-        assert!(!child_node_1.is_leaf());
-        assert!(!child_node_1.child_contains(1));
-        assert!(child_node_1.child_contains(2));
         assert_eq!(child_node_1.search(1), None);
         assert_eq!(child_node_1.search(2), Some(Rc::clone(&child_node_2)));
         assert_eq!(child_node_1.item, Some(1));
 
         assert!(!child_node_2.is_root());
-        assert!(child_node_2.is_leaf());
-        assert!(!child_node_2.child_contains(1));
-        assert!(!child_node_2.child_contains(2));
         assert_eq!(child_node_2.search(1), None);
         assert_eq!(child_node_2.search(2), None);
         assert_eq!(child_node_2.item, Some(2));
@@ -251,6 +317,5 @@ mod tests {
         for transaction in transactions.into_iter() {
             tree.add_transaction(transaction);
         }
-        tree.print();
     }
 }

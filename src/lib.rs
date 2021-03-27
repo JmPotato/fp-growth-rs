@@ -1,2 +1,2 @@
-pub mod fp_growth;
+pub mod algorithm;
 mod tree;
