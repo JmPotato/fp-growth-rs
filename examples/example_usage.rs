@@ -2,16 +2,17 @@ use fp_growth::algorithm::FPGrowth;
 
 fn main() {
     let transactions = vec![
-        vec!["c", "e", "a", "b", "f"],
+        vec!["e", "c", "a", "b", "f", "h"],
         vec!["a", "c", "g"],
         vec!["e"],
-        vec!["a", "c", "e", "g", "d"],
+        vec!["e", "c", "a", "g", "d"],
         vec!["a", "c", "e", "g"],
         vec!["e"],
         vec!["a", "c", "e", "b", "f"],
         vec!["a", "c", "d"],
+        vec!["g", "c", "e", "a"],
         vec!["a", "c", "e", "g"],
-        vec!["a", "c", "e", "g"],
+        vec!["i"],
     ];
     let minimum_support = 2;
     let fp_growth_str = FPGrowth::<&str>::new(transactions, minimum_support);

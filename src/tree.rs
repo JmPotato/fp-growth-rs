@@ -1,3 +1,5 @@
+//! `Tree` implements the tree data struct in FP-Growth algorithm.
+
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
@@ -10,7 +12,7 @@ use std::{
 type RcNode<T> = Rc<Node<T>>;
 type WeakRcNode<T> = Weak<Node<T>>;
 
-// Node represents the single node in a tree.
+/// `Node<T>` represents the single node in a tree.
 #[derive(Debug)]
 pub struct Node<T> {
     item: Option<T>,
@@ -36,8 +38,8 @@ impl<T> Node<T>
 where
     T: PartialEq + Copy + Debug,
 {
-    // Create a new Node with the given item and count.
-    fn new(item: Option<T>, count: usize) -> Node<T> {
+    /// Create a new Node with the given item and count.
+    pub fn new(item: Option<T>, count: usize) -> Node<T> {
         Node {
             item,
             count: Cell::new(count),
@@ -47,13 +49,13 @@ where
         }
     }
 
-    // Create a new Rc<Node> with the given item and count.
-    fn new_rc(item: Option<T>, count: usize) -> RcNode<T> {
+    /// Create a new Rc<Node> with the given item and count.
+    pub fn new_rc(item: Option<T>, count: usize) -> RcNode<T> {
         Rc::new(Self::new(item, count))
     }
 
-    // Add the given child Node as a child of this node.
-    fn add_child(self: &Rc<Self>, child_node: RcNode<T>) {
+    /// Add the given child Node as a child of this node.
+    pub fn add_child(self: &Rc<Self>, child_node: RcNode<T>) {
         let mut children = self.children.borrow_mut();
         if !children.contains(&child_node) {
             *child_node.parent.borrow_mut() = Rc::downgrade(self);
@@ -61,9 +63,9 @@ where
         }
     }
 
-    // Check whether this node contains a child node for the given item.
-    // If so, that node's reference is returned; otherwise, `None` is returned.
-    fn search(&self, item: T) -> Option<RcNode<T>> {
+    /// Check whether this node contains a child node for the given item.
+    /// If so, that node's reference is returned; otherwise, `None` is returned.
+    pub fn search(&self, item: T) -> Option<RcNode<T>> {
         for node in self.children.borrow().iter() {
             if let Some(child_node_item) = node.item {
                 if child_node_item == item {
@@ -74,13 +76,14 @@ where
         None
     }
 
-    // Increment the count associated with this node's item.
-    fn increment(&self, incr_count: usize) {
+    /// Increment the count associated with this node's item.
+    pub fn increment(&self, incr_count: usize) {
         let old_count = self.count.get();
         self.count.set(old_count + incr_count);
     }
 
-    fn print(&self, depth: usize) {
+    /// Print out the node.
+    pub fn print(&self, depth: usize) {
         let padding = " ".repeat(depth);
         let node_info;
         match self.is_root() {
@@ -93,34 +96,50 @@ where
         }
     }
 
+    /// Return the count value this node's item holds.
     pub fn count(&self) -> usize {
         self.count.get()
     }
 
-    fn neighbor(&self) -> Option<RcNode<T>> {
+    /// Return this node's neighbor node.
+    pub fn neighbor(&self) -> Option<RcNode<T>> {
         self.neighbor.borrow().upgrade()
     }
 
-    fn parent(&self) -> Option<RcNode<T>> {
+    /// Return this node's parent node.
+    pub fn parent(&self) -> Option<RcNode<T>> {
         self.parent.borrow().upgrade()
     }
-    fn is_root(&self) -> bool {
+
+    /// Check whether this node is a root node.
+    pub fn is_root(&self) -> bool {
         self.item == None && self.count.get() == 0
     }
 }
 
-// Tree represents the main tree data struct will be used during the FP-Growth algorithm.
+type Route<T> = (RefCell<RcNode<T>>, RefCell<RcNode<T>>);
+
+/// `Tree<T>` represents the main tree data struct will be used during the FP-Growth algorithm.
 pub struct Tree<T> {
     root_node: RefCell<RcNode<T>>,
     // routes is a HashMap who maintains a mapping which satisfies item -> (Head node, tail node).
-    routes: HashMap<T, (RefCell<RcNode<T>>, RefCell<RcNode<T>>)>,
+    routes: HashMap<T, Route<T>>,
+}
+
+impl<T> Default for Tree<T>
+where
+    T: Eq + Copy + Hash + Debug,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> Tree<T>
 where
     T: Eq + Copy + Hash + Debug,
 {
-    // Create a new FP-Growth tree with an empty root node.
+    /// Create a new FP-Growth tree with an empty root node.
     pub fn new() -> Tree<T> {
         Tree {
             root_node: RefCell::new(Node::new_rc(None, 0)),
@@ -128,8 +147,8 @@ where
         }
     }
 
-    // Generate a partial tree with the given paths.
-    // This function will be called during the algorithm.
+    /// Generate a partial tree with the given paths.
+    /// This function will be called during the algorithm.
     pub fn generate_partial_tree(paths: Vec<Vec<RcNode<T>>>) -> Tree<T> {
         let mut partial_tree = Tree::new();
         let mut leaf_item = None;
@@ -169,7 +188,7 @@ where
         partial_tree
     }
 
-    // Iterate the transaction and add every item to the FP-Growth tree.
+    /// Iterate the transaction and add every item to the FP-Growth tree.
     pub fn add_transaction(&mut self, transaction: Vec<T>) {
         let mut cur_node = Rc::clone(&self.root_node.borrow());
         for item in transaction.into_iter() {
@@ -190,7 +209,8 @@ where
         }
     }
 
-    fn update_route(&mut self, node: RcNode<T>) {
+    /// Update the route table that records the item and its node list.
+    pub fn update_route(&mut self, node: RcNode<T>) {
         if let Some(item) = node.item {
             match self.routes.get(&item) {
                 Some((_, tail)) => {
@@ -205,7 +225,7 @@ where
         }
     }
 
-    // Generate the prefix paths that end with the given item.
+    /// Generate the prefix paths that end with the given item.
     pub fn generate_prefix_path(&self, item: T) -> Vec<Vec<RcNode<T>>> {
         let mut cur_end_node = Rc::clone(&self.routes.get(&item).unwrap().0.borrow());
         let mut paths = vec![];
@@ -229,7 +249,8 @@ where
         paths
     }
 
-    fn get_all_nodes(&self, item: T) -> Vec<RcNode<T>> {
+    /// Get all nodes that holds the given item.
+    pub fn get_all_nodes(&self, item: T) -> Vec<RcNode<T>> {
         match self.routes.get(&item) {
             None => vec![],
             Some((head_node, _)) => {
@@ -244,7 +265,7 @@ where
         }
     }
 
-    // Get all nodes with the given item.
+    /// Get all nodes with the given item.
     pub fn get_all_items_nodes(&self) -> Vec<(T, Vec<RcNode<T>>)> {
         let mut items_nodes = vec![];
         for (item, _) in self.routes.iter() {
@@ -254,7 +275,7 @@ where
     }
 
     #[allow(dead_code)]
-    // Print out the tree.
+    /// Print out the tree.
     pub fn print(&self) {
         println!("Tree:");
         self.root_node.borrow().print(1);

@@ -1,7 +1,13 @@
+//! `algorithm` is the core module of FP-Growth algorithm.
+//! It implements the algorithm based on the internal data structs [`crate::tree::Node<T>`] and [`crate::tree::Tree<T>`].
+
 use std::{cmp::Ordering, collections::HashMap, fmt::Debug, hash::Hash, usize};
 
 use crate::tree::Tree;
 
+/// `FPGrowth<T>` represents an algorithm instance, it should include the `transactions` input
+/// and minimum support value as the initial config. Once it is created, you could run
+/// [`FPGrowth::find_frequent_patterns()`] to start the frequent patterns mining.
 pub struct FPGrowth<T> {
     transactions: Vec<Vec<T>>,
     minimum_support: usize,
@@ -9,8 +15,9 @@ pub struct FPGrowth<T> {
 
 impl<T> FPGrowth<T>
 where
-    T: Eq + Ord + Hash + Debug + Copy,
+    T: Eq + Ord + Hash + Copy + Debug,
 {
+    /// Create a FP-Growth algorithm instance with the given `transactions` and `minimum_support`.
     pub fn new(transactions: Vec<Vec<T>>, minimum_support: usize) -> FPGrowth<T> {
         FPGrowth {
             transactions,
@@ -18,7 +25,7 @@ where
         }
     }
 
-    // Find frequent patterns in the given transactions using FP-Growth.
+    /// Find frequent patterns in the given transactions using FP-Growth.
     pub fn find_frequent_patterns(&self) -> Vec<(Vec<T>, usize)> {
         // Collect the transaction.
         let mut items = HashMap::new();
@@ -49,18 +56,16 @@ where
                     Ordering::Equal => {
                         // When counter is the same, we will sort by T itself.
                         // e.g. ["c", "b", "a"] -> ["a", "b", "c"]
-                        if *b < *a {
-                            return Ordering::Greater;
-                        } else if *b > *a {
-                            return Ordering::Less;
+                        match b.cmp(a) {
+                            Ordering::Greater => Ordering::Less,
+                            Ordering::Less => Ordering::Greater,
+                            Ordering::Equal => Ordering::Equal,
                         }
-                        Ordering::Equal
                     }
                     Ordering::Less => Ordering::Less,
                     Ordering::Greater => Ordering::Greater,
                 }
             });
-            println! {"{:?}", cleaned_transaction};
             tree.add_transaction(cleaned_transaction);
         }
 
@@ -94,21 +99,22 @@ mod tests {
     #[test]
     fn test_algorithm() {
         let transactions = vec![
-            vec!["a", "c", "e", "b", "f", "h"],
+            vec!["e", "c", "a", "b", "f", "h"],
             vec!["a", "c", "g"],
             vec!["e"],
-            vec!["a", "c", "e", "g", "d"],
+            vec!["e", "c", "a", "g", "d"],
             vec!["a", "c", "e", "g"],
             vec!["e"],
             vec!["a", "c", "e", "b", "f"],
             vec!["a", "c", "d"],
+            vec!["g", "c", "e", "a"],
             vec!["a", "c", "e", "g"],
-            vec!["a", "c", "e", "g"],
+            vec!["i"],
         ];
         // FIXME: use specific result cases to verify correctness.
         let test_cases: Vec<(usize, usize)> = vec![
             // minimum_support and the number of corresponding results
-            (1, 87),
+            (1, 88),
             (2, 43),
             (3, 15),
             (4, 15),
