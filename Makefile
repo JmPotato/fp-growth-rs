@@ -1,6 +1,6 @@
 .PHONY: all build test dev bench format clean examples clippy
 
-all: format clippy build test examples
+all: clean format clippy build test examples
 
 build:
 	cargo build
@@ -23,4 +23,4 @@ examples:
 	cargo build --example example_usage
 
 clippy:
-	cargo clippy --all --all-targets -- -D clippy::all
+	cargo clippy --all -- -D clippy::all

@@ -4,10 +4,11 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     fmt::Debug,
-    hash::Hash,
     rc::{Rc, Weak},
     usize,
 };
+
+use crate::ItemType;
 
 type RcNode<T> = Rc<Node<T>>;
 type WeakRcNode<T> = Weak<Node<T>>;
@@ -15,7 +16,7 @@ type WeakRcNode<T> = Weak<Node<T>>;
 /// `Node<T>` represents the single node in a tree.
 #[derive(Debug)]
 pub struct Node<T> {
-    item: Option<T>,
+    pub item: Option<T>,
     count: Cell<usize>,
     children: RefCell<Vec<RcNode<T>>>,
     // Use Weak reference here to prevent the reference cycle.
@@ -25,19 +26,13 @@ pub struct Node<T> {
     neighbor: RefCell<WeakRcNode<T>>,
 }
 
-impl<T> PartialEq for Node<T>
-where
-    T: PartialEq,
-{
+impl<T: ItemType> PartialEq for Node<T> {
     fn eq(&self, other: &Node<T>) -> bool {
         self.item == other.item && self.parent.borrow().upgrade() == other.parent.borrow().upgrade()
     }
 }
 
-impl<T> Node<T>
-where
-    T: PartialEq + Copy + Debug,
-{
+impl<T: ItemType> Node<T> {
     /// Create a new Node with the given item and count.
     pub fn new(item: Option<T>, count: usize) -> Node<T> {
         Node {
@@ -126,19 +121,13 @@ pub struct Tree<T> {
     routes: HashMap<T, Route<T>>,
 }
 
-impl<T> Default for Tree<T>
-where
-    T: Eq + Copy + Hash + Debug,
-{
+impl<T: ItemType> Default for Tree<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> Tree<T>
-where
-    T: Eq + Copy + Hash + Debug,
-{
+impl<T: ItemType> Tree<T> {
     /// Create a new FP-Growth tree with an empty root node.
     pub fn new() -> Tree<T> {
         Tree {
@@ -149,7 +138,7 @@ where
 
     /// Generate a partial tree with the given paths.
     /// This function will be called during the algorithm.
-    pub fn generate_partial_tree(paths: Vec<Vec<RcNode<T>>>) -> Tree<T> {
+    pub fn generate_partial_tree(paths: &[Vec<RcNode<T>>]) -> Tree<T> {
         let mut partial_tree = Tree::new();
         let mut leaf_item = None;
         for path in paths.iter() {
@@ -191,7 +180,7 @@ where
     /// Iterate the transaction and add every item to the FP-Growth tree.
     pub fn add_transaction(&mut self, transaction: Vec<T>) {
         let mut cur_node = Rc::clone(&self.root_node.borrow());
-        for item in transaction.into_iter() {
+        for &item in transaction.iter() {
             match cur_node.search(item) {
                 // There is already a node in this tree for the current
                 // transaction item; reuse it.
@@ -286,57 +275,6 @@ where
                 println!("{:?}", Rc::into_raw(Rc::clone(node)));
                 println!("<{:?} {}>", node.item, node.count.get());
             }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::tree::{Node, Tree};
-    use std::rc::Rc;
-
-    #[test]
-    fn test_node() {
-        let root_node = Node::<i32>::new_rc(None, 0);
-        let child_node_1 = Rc::new(Node::<i32>::new(Some(1), 1));
-        let child_node_2 = Rc::new(Node::<i32>::new(Some(2), 2));
-
-        root_node.add_child(Rc::clone(&child_node_1));
-        child_node_1.add_child(Rc::clone(&child_node_2));
-
-        assert!(root_node.is_root());
-        assert_eq!(root_node.search(1), Some(Rc::clone(&child_node_1)));
-        assert_eq!(root_node.search(2), None);
-        assert_eq!(root_node.item, None);
-
-        assert!(!child_node_1.is_root());
-        assert_eq!(child_node_1.search(1), None);
-        assert_eq!(child_node_1.search(2), Some(Rc::clone(&child_node_2)));
-        assert_eq!(child_node_1.item, Some(1));
-
-        assert!(!child_node_2.is_root());
-        assert_eq!(child_node_2.search(1), None);
-        assert_eq!(child_node_2.search(2), None);
-        assert_eq!(child_node_2.item, Some(2));
-    }
-
-    #[test]
-    fn test_tree() {
-        let mut tree = Tree::<&str>::new();
-        let transactions = vec![
-            vec!["a", "c", "e", "b", "f"],
-            vec!["a", "c", "g"],
-            vec!["e"],
-            vec!["a", "c", "e", "g", "d"],
-            vec!["a", "c", "e", "g"],
-            vec!["e"],
-            vec!["a", "c", "e", "b", "f"],
-            vec!["a", "c", "d"],
-            vec!["a", "c", "e", "g"],
-            vec!["a", "c", "e", "g"],
-        ];
-        for transaction in transactions.into_iter() {
-            tree.add_transaction(transaction);
         }
     }
 }
