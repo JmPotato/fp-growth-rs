@@ -1,7 +1,11 @@
 //! `algorithm` is the core module of FP-Growth algorithm.
 //! It implements the algorithm based on the internal data structs [`crate::tree::Node<T>`] and [`crate::tree::Tree<T>`].
 
-use std::{cmp::Ordering, collections::HashMap, usize};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    usize,
+};
 
 use crate::tree::Tree;
 use crate::ItemType;
@@ -27,12 +31,21 @@ impl<T: ItemType> FPGrowth<T> {
 
     /// Find frequent patterns in the given transactions using FP-Growth.
     pub fn find_frequent_patterns(&self) -> Vec<(Vec<T>, usize)> {
-        // Collect the transaction.
+        // Collect and preprocess the transactions.
         let mut items = HashMap::new();
-        for transaction in self.transactions.iter() {
+        for transaction in self.transactions.clone().into_iter() {
+            let mut item_set: HashSet<T> = HashSet::new();
             for &item in transaction.iter() {
-                let count = items.entry(item).or_insert(0);
-                *count += 1;
+                // Check whether we have inserted the same item in a transaction before,
+                // make sure we won't calculate the wrong support.
+                match item_set.contains(&item) {
+                    true => continue,
+                    false => {
+                        item_set.insert(item);
+                        let count = items.entry(item).or_insert(0);
+                        *count += 1;
+                    }
+                };
             }
         }
 

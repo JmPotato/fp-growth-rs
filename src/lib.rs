@@ -92,12 +92,12 @@ mod tests {
     #[test]
     fn test_algorithm() {
         let transactions = vec![
-            vec!["e", "c", "a", "b", "f", "h"],
+            vec!["a", "c", "e", "b", "f", "h", "a", "e", "f"],
             vec!["a", "c", "g"],
             vec!["e"],
             vec!["e", "c", "a", "g", "d"],
             vec!["a", "c", "e", "g"],
-            vec!["e"],
+            vec!["e", "e"],
             vec!["a", "c", "e", "b", "f"],
             vec!["a", "c", "d"],
             vec!["g", "c", "e", "a"],
