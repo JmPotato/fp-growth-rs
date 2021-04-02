@@ -8,7 +8,9 @@ use crate::ItemType;
 
 /// `FPGrowth<T>` represents an algorithm instance, it should include the `transactions` input
 /// and minimum support value as the initial config. Once it is created, you could run
-/// [`FPGrowth::find_frequent_patterns()`] to start the frequent patterns mining.
+/// [`FPGrowth::find_frequent_patterns()`] to start the frequent pattern mining.
+// `transactions` will be sorted and deduplicated before starting the algorithm.
+#[allow(clippy::upper_case_acronyms)]
 pub struct FPGrowth<T> {
     transactions: Vec<Vec<T>>,
     minimum_support: usize,
@@ -63,6 +65,8 @@ impl<T: ItemType> FPGrowth<T> {
                     Ordering::Greater => Ordering::Greater,
                 }
             });
+            // After sort cleaned_transaction, remove consecutive items from it then.
+            cleaned_transaction.dedup();
             tree.add_transaction(cleaned_transaction);
         }
 
