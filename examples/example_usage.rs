@@ -17,9 +17,9 @@ fn main() {
     let minimum_support = 2;
     let fp_growth_str = FPGrowth::<&str>::new(transactions, minimum_support);
 
-    let results = fp_growth_str.find_frequent_patterns();
-    println!("The number of results: {}", &results.len());
-    for (frequent_pattern, support) in results.iter() {
+    let result = fp_growth_str.find_frequent_patterns();
+    println!("The number of results: {}", result.frequent_patterns_num());
+    for (frequent_pattern, support) in result.frequent_patterns().iter() {
         println!("{:?} {}", frequent_pattern, support);
     }
 }

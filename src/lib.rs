@@ -23,9 +23,9 @@
 //! ];
 //! let minimum_support = 2;
 //! let fp_growth_str = FPGrowth::<&str>::new(transactions, minimum_support);
-//! let results = fp_growth_str.find_frequent_patterns();
-//! println!("The number of results: {}", &results.len());
-//! for (frequent_pattern, support) in results.iter() {
+//! let result = fp_growth_str.find_frequent_patterns();
+//! println!("The number of results: {}", result.frequent_patterns_num());
+//! for (frequent_pattern, support) in result.frequent_patterns().iter() {
 //!     println!("{:?} {}", frequent_pattern, support);
 //! }
 //! ```
@@ -105,22 +105,23 @@ mod tests {
             vec!["i"],
         ];
         // FIXME: use specific result cases to verify correctness.
-        let test_cases: Vec<(usize, usize)> = vec![
-            // minimum_support and the number of corresponding results
-            (1, 88),
-            (2, 43),
-            (3, 15),
-            (4, 15),
-            (5, 11),
-            (6, 7),
-            (7, 4),
-            (8, 4),
-            (9, 0),
+        let test_cases: Vec<(usize, usize, usize)> = vec![
+            // (minimum_support, frequent_patterns_num, elimination_set_num)
+            (1, 88, 0),
+            (2, 43, 2),
+            (3, 15, 5),
+            (4, 15, 5),
+            (5, 11, 5),
+            (6, 7, 9),
+            (7, 4, 9),
+            (8, 4, 9),
+            (9, 0, 11),
         ];
-        for (minimum_support, expect_number) in test_cases.iter() {
+        for (minimum_support, frequent_patterns_num, elimination_set_num) in test_cases.iter() {
             let fp_growth_str = FPGrowth::<&str>::new(transactions.clone(), *minimum_support);
             let result = fp_growth_str.find_frequent_patterns();
-            assert_eq!(*expect_number, result.len());
+            assert_eq!(*frequent_patterns_num, result.frequent_patterns_num());
+            assert_eq!(*elimination_set_num, result.elimination_set_num());
         }
     }
 }

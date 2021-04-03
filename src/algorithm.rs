@@ -10,6 +10,41 @@ use std::{
 use crate::tree::Tree;
 use crate::ItemType;
 
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Clone, Debug)]
+pub struct FPResult<T> {
+    frequent_patterns: Vec<(Vec<T>, usize)>,
+    elimination_set: Vec<Vec<T>>,
+}
+
+impl<T: ItemType> FPResult<T> {
+    pub fn new(
+        frequent_patterns: Vec<(Vec<T>, usize)>,
+        elimination_set: Vec<Vec<T>>,
+    ) -> FPResult<T> {
+        FPResult {
+            frequent_patterns,
+            elimination_set,
+        }
+    }
+
+    pub fn frequent_patterns_num(&self) -> usize {
+        self.frequent_patterns.len()
+    }
+
+    pub fn frequent_patterns(&self) -> Vec<(Vec<T>, usize)> {
+        self.frequent_patterns.clone()
+    }
+
+    pub fn elimination_set_num(&self) -> usize {
+        self.elimination_set.len()
+    }
+
+    pub fn elimination_set(&self) -> Vec<Vec<T>> {
+        self.elimination_set.clone()
+    }
+}
+
 /// `FPGrowth<T>` represents an algorithm instance, it should include the `transactions` input
 /// and minimum support value as the initial config. Once it is created, you could run
 /// [`FPGrowth::find_frequent_patterns()`] to start the frequent pattern mining.
@@ -30,7 +65,7 @@ impl<T: ItemType> FPGrowth<T> {
     }
 
     /// Find frequent patterns in the given transactions using FP-Growth.
-    pub fn find_frequent_patterns(&self) -> Vec<(Vec<T>, usize)> {
+    pub fn find_frequent_patterns(&self) -> FPResult<T> {
         // Collect and preprocess the transactions.
         let mut items = HashMap::new();
         for transaction in self.transactions.clone().into_iter() {
@@ -54,13 +89,18 @@ impl<T: ItemType> FPGrowth<T> {
             .iter()
             .filter(|(_, &count)| count >= self.minimum_support)
             .collect();
+        let mut elimination_set = vec![];
 
         let mut tree = Tree::<T>::new();
         for transaction in self.transactions.clone().into_iter() {
             let mut cleaned_transaction: Vec<T> = transaction
+                .clone()
                 .into_iter()
                 .filter(|item| cleaned_items.contains_key(item))
                 .collect();
+            if cleaned_transaction.len() != transaction.len() {
+                elimination_set.push(transaction);
+            }
             cleaned_transaction.sort_by(|a, b| {
                 let &a_counter = cleaned_items.get(a).unwrap();
                 let &b_counter = cleaned_items.get(b).unwrap();
@@ -83,7 +123,10 @@ impl<T: ItemType> FPGrowth<T> {
             tree.add_transaction(cleaned_transaction);
         }
 
-        self.find_with_suffix(&tree, &[])
+        FPResult {
+            frequent_patterns: self.find_with_suffix(&tree, &[]),
+            elimination_set,
+        }
     }
 
     fn find_with_suffix(&self, tree: &Tree<T>, suffix: &[T]) -> Vec<(Vec<T>, usize)> {
