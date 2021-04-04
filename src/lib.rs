@@ -89,6 +89,7 @@ mod tests {
             tree.add_transaction(transaction);
         }
     }
+
     #[test]
     fn test_algorithm() {
         let transactions = vec![
@@ -107,21 +108,21 @@ mod tests {
         // FIXME: use specific result cases to verify correctness.
         let test_cases: Vec<(usize, usize, usize)> = vec![
             // (minimum_support, frequent_patterns_num, elimination_set_num)
-            (1, 88, 0),
-            (2, 43, 2),
-            (3, 15, 5),
-            (4, 15, 5),
-            (5, 11, 5),
-            (6, 7, 9),
-            (7, 4, 9),
-            (8, 4, 9),
+            (1, 88, 88),
+            (2, 43, 47),
+            (3, 15, 20),
+            (4, 15, 20),
+            (5, 11, 17),
+            (6, 7, 16),
+            (7, 4, 15),
+            (8, 4, 15),
             (9, 0, 11),
         ];
         for (minimum_support, frequent_patterns_num, elimination_set_num) in test_cases.iter() {
             let fp_growth_str = FPGrowth::<&str>::new(transactions.clone(), *minimum_support);
             let result = fp_growth_str.find_frequent_patterns();
             assert_eq!(*frequent_patterns_num, result.frequent_patterns_num());
-            assert_eq!(*elimination_set_num, result.elimination_set_num());
+            assert_eq!(*elimination_set_num, result.elimination_sets_num());
         }
     }
 }

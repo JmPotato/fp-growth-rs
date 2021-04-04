@@ -14,17 +14,17 @@ use crate::ItemType;
 #[derive(Clone, Debug)]
 pub struct FPResult<T> {
     frequent_patterns: Vec<(Vec<T>, usize)>,
-    elimination_set: Vec<Vec<T>>,
+    elimination_sets: Vec<Vec<T>>,
 }
 
 impl<T: ItemType> FPResult<T> {
     pub fn new(
         frequent_patterns: Vec<(Vec<T>, usize)>,
-        elimination_set: Vec<Vec<T>>,
+        elimination_sets: Vec<Vec<T>>,
     ) -> FPResult<T> {
         FPResult {
             frequent_patterns,
-            elimination_set,
+            elimination_sets,
         }
     }
 
@@ -36,12 +36,12 @@ impl<T: ItemType> FPResult<T> {
         self.frequent_patterns.clone()
     }
 
-    pub fn elimination_set_num(&self) -> usize {
-        self.elimination_set.len()
+    pub fn elimination_sets_num(&self) -> usize {
+        self.elimination_sets.len()
     }
 
-    pub fn elimination_set(&self) -> Vec<Vec<T>> {
-        self.elimination_set.clone()
+    pub fn elimination_sets(&self) -> Vec<Vec<T>> {
+        self.elimination_sets.clone()
     }
 }
 
@@ -89,7 +89,7 @@ impl<T: ItemType> FPGrowth<T> {
             .iter()
             .filter(|(_, &count)| count >= self.minimum_support)
             .collect();
-        let mut elimination_set = vec![];
+        let mut elimination_sets = vec![];
 
         let mut tree = Tree::<T>::new();
         for transaction in self.transactions.clone().into_iter() {
@@ -99,7 +99,7 @@ impl<T: ItemType> FPGrowth<T> {
                 .filter(|item| cleaned_items.contains_key(item))
                 .collect();
             if cleaned_transaction.len() != transaction.len() {
-                elimination_set.push(transaction);
+                elimination_sets.push(transaction);
             }
             cleaned_transaction.sort_by(|a, b| {
                 let &a_counter = cleaned_items.get(a).unwrap();
@@ -123,28 +123,40 @@ impl<T: ItemType> FPGrowth<T> {
             tree.add_transaction(cleaned_transaction);
         }
 
-        FPResult {
-            frequent_patterns: self.find_with_suffix(&tree, &[]),
-            elimination_set,
-        }
+        let mut fp_result = self.find_with_suffix(&tree, &[]);
+        fp_result.elimination_sets.append(&mut elimination_sets);
+        fp_result
     }
 
-    fn find_with_suffix(&self, tree: &Tree<T>, suffix: &[T]) -> Vec<(Vec<T>, usize)> {
-        let mut results = vec![];
+    fn find_with_suffix(&self, tree: &Tree<T>, suffix: &[T]) -> FPResult<T> {
+        let mut fp_result = FPResult {
+            frequent_patterns: vec![],
+            elimination_sets: vec![],
+        };
         for (item, nodes) in tree.get_all_items_nodes().iter() {
             let mut support = 0;
             for node in nodes.iter() {
                 support += node.count();
             }
+            let mut frequent_pattern = vec![*item];
+            frequent_pattern.append(&mut Vec::from(suffix));
             if support >= self.minimum_support && !suffix.contains(item) {
-                let mut frequent_pattern = vec![*item];
-                frequent_pattern.append(&mut Vec::from(suffix));
-                results.push((frequent_pattern.clone(), support));
+                fp_result
+                    .frequent_patterns
+                    .push((frequent_pattern.clone(), support));
 
                 let partial_tree = Tree::generate_partial_tree(&tree.generate_prefix_path(*item));
-                results.append(&mut self.find_with_suffix(&partial_tree, &frequent_pattern));
+                let mut mid_fp_result = self.find_with_suffix(&partial_tree, &frequent_pattern);
+                fp_result
+                    .frequent_patterns
+                    .append(&mut mid_fp_result.frequent_patterns);
+                fp_result
+                    .elimination_sets
+                    .append(&mut mid_fp_result.elimination_sets);
+            } else {
+                fp_result.elimination_sets.push(frequent_pattern);
             }
         }
-        results
+        fp_result
     }
 }
