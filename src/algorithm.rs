@@ -14,13 +14,13 @@ use crate::ItemType;
 #[derive(Clone, Debug)]
 pub struct FPResult<T> {
     frequent_patterns: Vec<(Vec<T>, usize)>,
-    elimination_sets: Vec<Vec<T>>,
+    elimination_sets: HashSet<Vec<T>>,
 }
 
 impl<T: ItemType> FPResult<T> {
     pub fn new(
         frequent_patterns: Vec<(Vec<T>, usize)>,
-        elimination_sets: Vec<Vec<T>>,
+        elimination_sets: HashSet<Vec<T>>,
     ) -> FPResult<T> {
         FPResult {
             frequent_patterns,
@@ -41,7 +41,7 @@ impl<T: ItemType> FPResult<T> {
     }
 
     pub fn elimination_sets(&self) -> Vec<Vec<T>> {
-        self.elimination_sets.clone()
+        self.elimination_sets.clone().into_iter().collect()
     }
 }
 
@@ -89,7 +89,7 @@ impl<T: ItemType> FPGrowth<T> {
             .iter()
             .filter(|(_, &count)| count >= self.minimum_support)
             .collect();
-        let mut elimination_sets = vec![];
+        let mut elimination_sets = HashSet::new();
 
         let mut tree = Tree::<T>::new();
         for transaction in self.transactions.clone().into_iter() {
@@ -99,7 +99,7 @@ impl<T: ItemType> FPGrowth<T> {
                 .filter(|item| cleaned_items.contains_key(item))
                 .collect();
             if cleaned_transaction.len() != transaction.len() {
-                elimination_sets.push(transaction);
+                elimination_sets.insert(transaction);
             }
             cleaned_transaction.sort_by(|a, b| {
                 let &a_counter = cleaned_items.get(a).unwrap();
@@ -124,15 +124,12 @@ impl<T: ItemType> FPGrowth<T> {
         }
 
         let mut fp_result = self.find_with_suffix(&tree, &[]);
-        fp_result.elimination_sets.append(&mut elimination_sets);
+        fp_result.elimination_sets.extend(elimination_sets);
         fp_result
     }
 
     fn find_with_suffix(&self, tree: &Tree<T>, suffix: &[T]) -> FPResult<T> {
-        let mut fp_result = FPResult {
-            frequent_patterns: vec![],
-            elimination_sets: vec![],
-        };
+        let mut fp_result = FPResult::new(vec![], HashSet::new());
         for (item, nodes) in tree.get_all_items_nodes().iter() {
             let mut support = 0;
             for node in nodes.iter() {
@@ -152,9 +149,9 @@ impl<T: ItemType> FPGrowth<T> {
                     .append(&mut mid_fp_result.frequent_patterns);
                 fp_result
                     .elimination_sets
-                    .append(&mut mid_fp_result.elimination_sets);
+                    .extend(mid_fp_result.elimination_sets);
             } else {
-                fp_result.elimination_sets.push(frequent_pattern);
+                fp_result.elimination_sets.insert(frequent_pattern);
             }
         }
         fp_result

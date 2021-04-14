@@ -57,17 +57,17 @@ mod tests {
         assert!(root_node.is_root());
         assert_eq!(root_node.search(1), Some(Rc::clone(&child_node_1)));
         assert_eq!(root_node.search(2), None);
-        assert_eq!(root_node.item, None);
+        assert_eq!(root_node.item(), None);
 
         assert!(!child_node_1.is_root());
         assert_eq!(child_node_1.search(1), None);
         assert_eq!(child_node_1.search(2), Some(Rc::clone(&child_node_2)));
-        assert_eq!(child_node_1.item, Some(1));
+        assert_eq!(child_node_1.item(), Some(1));
 
         assert!(!child_node_2.is_root());
         assert_eq!(child_node_2.search(1), None);
         assert_eq!(child_node_2.search(2), None);
-        assert_eq!(child_node_2.item, Some(2));
+        assert_eq!(child_node_2.item(), Some(2));
     }
 
     #[test]
@@ -113,10 +113,10 @@ mod tests {
             (3, 15, 20),
             (4, 15, 20),
             (5, 11, 17),
-            (6, 7, 16),
-            (7, 4, 15),
-            (8, 4, 15),
-            (9, 0, 11),
+            (6, 7, 15),
+            (7, 4, 14),
+            (8, 4, 14),
+            (9, 0, 10),
         ];
         for (minimum_support, frequent_patterns_num, elimination_set_num) in test_cases.iter() {
             let fp_growth_str = FPGrowth::<&str>::new(transactions.clone(), *minimum_support);

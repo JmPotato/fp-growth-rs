@@ -16,7 +16,7 @@ type WeakRcNode<T> = Weak<Node<T>>;
 /// `Node<T>` represents the single node in a tree.
 #[derive(Debug)]
 pub struct Node<T> {
-    pub item: Option<T>,
+    item: Option<T>,
     count: Cell<usize>,
     children: RefCell<Vec<RcNode<T>>>,
     // Use Weak reference here to prevent the reference cycle.
@@ -58,6 +58,17 @@ impl<T: ItemType> Node<T> {
         }
     }
 
+    pub fn remove_child(self: &Rc<Self>, child_node: RcNode<T>) {
+        let mut children = self.children.borrow_mut();
+        // for (index, node) in children.clone().into_iter().enumerate() {
+        //     if node == child_node {
+        //         children.remove(index);
+        //     }
+        // }
+        let index = children.iter().position(|x| *x == child_node).unwrap();
+        children.remove(index);
+    }
+
     /// Check whether this node contains a child node for the given item.
     /// If so, that node's reference is returned; otherwise, `None` is returned.
     pub fn search(&self, item: T) -> Option<RcNode<T>> {
@@ -91,6 +102,10 @@ impl<T: ItemType> Node<T> {
         }
     }
 
+    pub fn item(&self) -> Option<T> {
+        self.item
+    }
+
     /// Return the count value this node's item holds.
     pub fn count(&self) -> usize {
         self.count.get()
@@ -109,6 +124,11 @@ impl<T: ItemType> Node<T> {
     /// Check whether this node is a root node.
     pub fn is_root(&self) -> bool {
         self.item == None && self.count.get() == 0
+    }
+
+    /// Check whether this node is a leaf node.
+    pub fn is_leaf(&self) -> bool {
+        self.children.borrow().len() == 0
     }
 }
 
@@ -261,6 +281,70 @@ impl<T: ItemType> Tree<T> {
             items_nodes.push((*item, self.get_all_nodes(*item)));
         }
         items_nodes
+    }
+
+    #[allow(dead_code)]
+    // [W.I.P] Prune the tree to reduce the search space.
+    fn prune(&self) {
+        let items_nodes = self.get_all_items_nodes();
+        for (item, nodes) in items_nodes.iter() {
+            if nodes.len() == 1 {
+                continue;
+            }
+            // Find all paths this item belongs to.
+            let mut all_paths = Vec::with_capacity(nodes.len());
+            let mut leaf_node_count = Vec::with_capacity(nodes.len());
+            for node in nodes.iter() {
+                if !node.is_leaf() {
+                    continue;
+                }
+                leaf_node_count.push(node.count());
+                let mut path = vec![];
+                let mut cur_node = Rc::clone(node);
+                while !cur_node.is_root() {
+                    path.push(Rc::clone(&cur_node));
+                    let parent_node = cur_node.parent().unwrap();
+                    cur_node = Rc::clone(&parent_node);
+                }
+                path.push(cur_node);
+                path.reverse();
+                all_paths.push(path);
+            }
+            if all_paths.len() < 2 {
+                continue;
+            }
+            // Find the common ancestor for all paths.
+            let mut common_ancestor_index = 0;
+            let mut common_ancestor = None;
+            for (index, node) in all_paths[0].iter().enumerate() {
+                let mut is_ancestor = true;
+                for path in all_paths.iter().skip(1) {
+                    let cur_node = Rc::clone(&path[index]);
+                    if cur_node != Rc::clone(node) {
+                        is_ancestor = false;
+                        break;
+                    }
+                }
+                if !is_ancestor {
+                    break;
+                }
+                common_ancestor_index = index;
+                common_ancestor = Some(node);
+            }
+            // Prune nodes which start from the common ancestor.
+            for (path_index, path) in all_paths.iter().enumerate() {
+                for node in path.iter().skip(common_ancestor_index + 1) {
+                    if node.count() <= leaf_node_count[path_index] {
+                        let parent_node = node.parent().unwrap();
+                        parent_node.remove_child(Rc::clone(node));
+                        break;
+                    }
+                }
+            }
+            common_ancestor
+                .unwrap()
+                .add_child(Node::new_rc(Some(*item), leaf_node_count.iter().sum()));
+        }
     }
 
     #[allow(dead_code)]
